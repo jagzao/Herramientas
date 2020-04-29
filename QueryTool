@@ -1,0 +1,116 @@
+using Cosmic;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace DigitalContracts.Common.Tools
+{
+    public class QueryTool
+    {
+        public static string GenQuestConsulta<T>(
+            ConsultaDto consultaDto,
+            bool RemoveStartId,
+            bool? isActivo = null,
+            List<string> lstFno = null,
+            List<string> lstFsi = null) where T : class, new()
+        {
+            if (string.IsNullOrEmpty(consultaDto.search)) consultaDto.search = "";
+            var palabras = consultaDto.search.Split(' ');
+            var palabra1 = palabras.FirstOrDefault();
+
+            T obj = new T();
+            var type = obj.GetType();
+            string nameTable = type.Name;
+            string sActivo = "  ";
+
+            string query = " SELECT * FROM " + nameTable;
+            var tiposExcluir = new List<string>
+            {
+                "icollection1", "IEnumerable", "IQuer"
+            };
+            var spropiedades = obj
+                                .GetType()
+                                .GetProperties()
+                                .Select(s => s.PropertyType.Name.AlMinimo())
+                                .ToList();
+            var propiedades = obj
+                                .GetType()
+                                .GetProperties()
+                                .Where(s => !tiposExcluir.Contains(s.PropertyType.Name.AlMinimo()))
+                                .ToList();
+            var propAct = propiedades
+                            .FirstOrDefault(s => s.Name.ToLower().Contains("activo") ||
+                                                    s.Name.ToLower().Contains("eliminado"));
+            if (propAct != null) sActivo = propAct.Name;
+            else sActivo = null;
+            string IdTabla = propiedades[0].Name;
+
+            if (palabras.Count() > 0 &&
+                (!string.IsNullOrEmpty(palabras[0]) || !string.IsNullOrWhiteSpace(palabras[0])))
+            {
+                query += $" WHERE ( ";
+                for (int i = 0; i < propiedades.Count; i++)
+                {
+                    var prop = propiedades[i];
+
+                    if (RemoveStartId
+                        && !prop.Name.ToLower().StartsWith("id")
+                        && prop.Name != sActivo)
+                    {
+                        query += $" {prop.Name} LIKE '%{palabras[0]}%' ";
+                        if (i < propiedades.Count
+                            && i < propiedades.Count
+                            || propiedades[i + 1].Name != sActivo)
+                            query += " OR";
+                    }
+                }
+                query += ") ";
+                query = query.Replace("OR)", ")");
+                for (int i = 1; i < palabras.Count(); i++)
+                {
+                    string palabra = palabras[i];
+                    query += $" AND {IdTabla} in (select {IdTabla} from {nameTable} WHERE";
+                    for (int y = 0; y < propiedades.Count; y++)
+                    {
+                        var prop = propiedades[i];
+                        if (RemoveStartId
+                            && !prop.Name.ToLower().StartsWith("id")
+                            && prop.Name != sActivo)
+                            query += $" {prop.Name} LIKE '%{palabras[0]}%' ";
+                        if (i < propiedades.Count
+                            && i < propiedades.Count
+                            || propiedades[i + 1].Name != sActivo)
+                            query += " OR";
+                    }
+                    query += ") ";
+                    query = query.Replace("OR)", ")");
+                }
+            }
+            if (isActivo != null && sActivo != null)
+            {
+                if (query.Contains("WHERE"))
+                    query += " AND ";
+                else
+                    query += " WHERE ";
+                query += $" {sActivo} = {(isActivo.Value ? '1' : '0')} ";
+            }
+            if (consultaDto.sortBy == null
+                || !propiedades.Any(s => s.Name.Contains(consultaDto.sortBy)))
+                consultaDto.sortBy = IdTabla;
+            if (consultaDto.Take == 0) consultaDto.Take = 5;
+
+            query += $" ORDER BY {consultaDto.sortBy}  OFFSET ({consultaDto.Skip}) ROWS FETCH NEXT ({consultaDto.Take}) ROWS ONLY ";
+
+            return query;
+        }
+    }
+
+    public class ConsultaDto
+    {
+        public int Skip { get; set; }
+        public int Take { get; set; }
+        public bool? descending { get; set; }
+        public string sortBy { get; set; }
+        public string search { get; set; }
+
+    }
+}
