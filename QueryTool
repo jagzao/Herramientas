@@ -75,7 +75,7 @@ namespace DigitalContracts.Common.Tools
                         if (RemoveStartId
                             && !prop.Name.ToLower().StartsWith("id")
                             && prop.Name != sActivo)
-                            query += $" {prop.Name} LIKE '%{palabras[0]}%' ";
+                            query += $" {prop.Name} LIKE '%{palabras[i]}%' ";
                         if (i < propiedades.Count
                             && i < propiedades.Count
                             || propiedades[i + 1].Name != sActivo)
@@ -98,7 +98,8 @@ namespace DigitalContracts.Common.Tools
                 consultaDto.sortBy = IdTabla;
             if (consultaDto.Take == 0) consultaDto.Take = 5;
 
-            query += $" ORDER BY {consultaDto.sortBy}  OFFSET ({consultaDto.Skip}) ROWS FETCH NEXT ({consultaDto.Take}) ROWS ONLY ";
+            string desc = consultaDto.descending.HasValue && consultaDto.descending.Value ? "desc" : "";
+            query += $" ORDER BY {consultaDto.sortBy} {desc} OFFSET ({consultaDto.Skip}) ROWS FETCH NEXT ({consultaDto.Take}) ROWS ONLY ";
 
             return query;
         }
